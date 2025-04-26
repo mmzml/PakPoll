@@ -1,0 +1,228 @@
+body {
+    font-family: sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+}
+
+.title {
+    align-content: center;
+    color: #28a745;
+}
+
+.container {
+    display: flex;
+    flex-grow: 1;
+    padding: 10px;
+    gap: 30px;
+}
+
+.left-panel {
+    flex: 1 1 55%;
+    /* Flex-grow, flex-shrink, flex-basis */
+    display: flex;
+    flex-direction: column;
+    max-width: 600px;
+    /* Optional: Limit width */
+}
+
+.right-panel {
+    flex: 1 1 45%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-left: 1px solid #ccc;
+    padding-left: 30px;
+}
+
+.new-sel {
+    display: inline-block;
+}
+
+.prov-list {
+    display: inline-block;
+    list-style: none;
+}
+
+h2, h3 {
+    text-align: center;
+    color: #333;
+}
+
+.polling-table, .results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    overflow-x: auto;
+    /* Allow horizontal scrolling if needed */
+}
+
+.polling-table th, .polling-table td, .results-table th, .results-table td {
+    border: 1px solid #ddd;
+    padding: 8px 10px;
+    text-align: center;
+}
+
+.polling-table th, .results-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+.polling-table td:first-child, .results-table td:first-child {
+    text-align: left;
+    font-weight: bold;
+    background-color: #f9f9f9;
+    min-width: 80px;
+    /* Ensure party names don't wrap too easily */
+}
+
+.polling-table input[type="number"] {
+    width: 60px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    text-align: right;
+    box-sizing: border-box;
+    /* Include padding/border in width */
+    -moz-appearance: textfield;
+    /* Firefox */
+}
+
+.polling-table input[type="number"]::-webkit-outer-spin-button, .polling-table input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.button-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    /* Space between buttons */
+    margin-bottom: 15px;
+}
+
+.map-button, .download-button, .clear-button {
+    /* Apply similar styles to both buttons */
+    padding: 12px 25px;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1.1em;
+    transition: background-color 0.2s ease;
+    /* align-self: center; Removed as container handles centering */
+}
+
+.map-button {
+    background-color: #007bff;
+}
+
+.download-button {
+    background-color: #28a745;
+    /* Green color for download */
+}
+
+.clear-button {
+    background-color: #861111;
+}
+
+.map-button:hover {
+    background-color: #0056b3;
+}
+
+.clear-button:hover {
+    background-color: #6e0101;
+}
+
+.download-button:hover:not(:disabled) {
+    /* Only hover effect when enabled */
+    background-color: #218838;
+}
+
+.map-button:disabled, .download-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.map-viewer {
+    width: 100%;
+    height: auto;
+    /* Maintain aspect ratio */
+    max-height: 80vh;
+    /* Limit height */
+    border: 1px solid #ccc;
+    background-color: #f8f8f8;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: auto;
+    /* Allow scrolling/panning if SVG is large */
+}
+
+.map-viewer svg {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+}
+
+#pakistanMapSvg path[id^="path"] {
+    stroke: #666;
+    stroke-width: 0.1;
+    fill: #eee;
+    transition: fill 0.1s ease-in-out;
+}
+
+.placeholder-text {
+    color: #888;
+    font-style: italic;
+}
+
+#statusMessage {
+    font-size: 0.9em;
+    color: #333;
+    text-align: center;
+    min-height: 1.2em;
+    margin-top: 5px;
+}
+
+/* Basic responsiveness */
+@media (max-width: 900px) {
+    .container {
+        flex-direction: column;
+        padding: 15px;
+        gap: 20px;
+    }
+
+    .right-panel {
+        border-left: none;
+        border-top: 1px solid #ccc;
+        padding-left: 0;
+        padding-top: 20px;
+    }
+
+    .left-panel, .right-panel {
+        flex-basis: auto;
+        max-width: none;
+    }
+
+    .map-viewer {
+        max-height: 60vh;
+    }
+
+    .button-container {
+        flex-direction: column;
+        /* Stack buttons vertically on small screens */
+        align-items: center;
+    }
+
+    .map-button, .download-button {
+        width: 80%;
+        /* Make buttons wider */
+        max-width: 300px;
+    }
+}
