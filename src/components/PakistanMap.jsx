@@ -1,7 +1,7 @@
-import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useRef, useEffect, useImperativeHandle, forwardRef, memo } from 'react';
 import mapSvgString from '../assets/pakistan-map.svg?raw';
 
-const PakistanMap = forwardRef(function PakistanMap(props, ref) {
+const PakistanMap = memo(forwardRef(function PakistanMap(props, ref) {
   const containerRef = useRef(null);
 
   // Expose the inner SVG element to parent via ref
@@ -18,8 +18,8 @@ const PakistanMap = forwardRef(function PakistanMap(props, ref) {
     const svgMap = container.querySelector('svg');
     if (!svgMap) return;
 
-    let viewBox = { x: 0, y: 0, h: svgMap.clientHeight, w: svgMap.clientWidth };
-    svgMap.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
+    const vb = svgMap.getAttribute('viewBox').split(/[\s,]+/).map(Number);
+    let viewBox = { x: vb[0], y: vb[1], w: vb[2], h: vb[3] };
     const svgSize = { w: svgMap.clientWidth, h: svgMap.clientHeight };
     let isPanning = false;
     let startPoint = { x: 0, y: 0 };
@@ -91,6 +91,6 @@ const PakistanMap = forwardRef(function PakistanMap(props, ref) {
       dangerouslySetInnerHTML={{ __html: mapSvgString }}
     />
   );
-});
+}));
 
 export default PakistanMap;

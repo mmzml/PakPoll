@@ -1,4 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
 import PakistanMap from './components/PakistanMap';
 import PollingTable from './components/PollingTable';
 import ResultsTable from './components/ResultsTable';
@@ -36,6 +38,11 @@ function getElementIds(provinceKey) {
 }
 
 export default function App() {
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
   const [inputs, setInputs] = useState(initialInputs);
   const [seats, setSeats] = useState([...startingSeats]);
   const [status, setStatus] = useState("Enter polling data and click 'Generate Map'.");
@@ -203,7 +210,11 @@ export default function App() {
 
   return (
     <>
-      <img src={logoSvg} alt="PakPoll logo" />
+      <button className="theme-toggle" onClick={() => setDarkMode(d => !d)}>
+        <FontAwesomeIcon icon={darkMode ? faSun : faMoon} />
+        {darkMode ? ' Light Mode' : ' Dark Mode'}
+      </button>
+      <img src={logoSvg} alt="PakPoll logo" className="logo" />
       <div className="container">
         <div className="left-panel">
           <h2>Enter Polling Data (%)</h2>
