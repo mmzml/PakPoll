@@ -52,7 +52,7 @@ export default function DonutChart({ seats, parties, partyColors }) {
                 d={arcPath(s.startAngle, s.endAngle)}
                 fill={`#${s.color}`}
                 stroke="white"
-                strokeWidth="1.5"
+                strokeWidth="0.5"
               />
             ))
           )}
