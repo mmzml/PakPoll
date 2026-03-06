@@ -1,9 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
+import { faSun, faMoon, faMagnifyingGlassPlus, faMagnifyingGlassMinus, faExpand, faDownload } from '@fortawesome/free-solid-svg-icons';
 import PakistanMap from './components/PakistanMap';
 import PollingTable from './components/PollingTable';
 import ResultsTable from './components/ResultsTable';
+import Tooltip from './components/Tooltip';
+import MiniMap from './components/MiniMap';
+import DonutChart from './components/DonutChart';
+import ConstituencyList from './components/ConstituencyList';
 import {
   parties, provinces, partyColors, defaultFillColor,
   baselineProvincialPct, startingSeats,
@@ -13,10 +17,8 @@ import { constituencyResultsData } from './data/constituencyData';
 import logoSvg from './assets/logo.svg';
 import './App.css';
 
-// Initial empty input state: [party][province] = ''
 const initialInputs = parties.map(() => provinces.map(() => ''));
 
-// Province checkbox config
 const provinceCheckboxes = [
   { id: 'kpk', label: 'KPK', key: 'KPK' },
   { id: 'pun', label: 'Punjab', key: 'Punjab' },
@@ -39,18 +41,38 @@ function getElementIds(provinceKey) {
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(false);
-
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
+
   const [inputs, setInputs] = useState(initialInputs);
   const [seats, setSeats] = useState([...startingSeats]);
+  const [provinceSeats, setProvinceSeats] = useState(null);
+  const [constituencyList, setConstituencyList] = useState(null);
+  const [activeTab, setActiveTab] = useState('map');
   const [status, setStatus] = useState("Enter polling data and click 'Generate Map'.");
   const [downloadEnabled, setDownloadEnabled] = useState(false);
   const [provincesVisible, setProvincesVisible] = useState({
     KPK: true, Punjab: true, Sindh: true, Balochistan: true, Kashmir: true,
   });
+  const [currentViewBox, setCurrentViewBox] = useState(null);
+  const [origViewBox, setOrigViewBox] = useState(null);
+  const [mapFills, setMapFills] = useState(null);
+
   const mapRef = useRef(null);
+  const tooltipDataMapRef = useRef(null);
+  const svgListenersRef = useRef({ move: null, leave: null });
+  const [tooltip, setTooltip] = useState({ visible: false });
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const orig = mapRef.current.getOrigViewBox();
+    if (orig) {
+      setOrigViewBox(orig);
+      setCurrentViewBox({ ...orig });
+    }
+    mapRef.current.subscribeViewBox(vb => setCurrentViewBox({ ...vb }));
+  }, []);
 
   function handleInputChange(partyIdx, provIdx, value) {
     setInputs(prev => {
@@ -115,6 +137,12 @@ export default function App() {
     });
 
     const newSeats = new Array(parties.length).fill(0);
+    const seatsByProvince = {};
+    provinces.forEach(p => { seatsByProvince[p] = new Array(parties.length).fill(0); });
+
+    const tooltipDataMap = new Map();
+    const fillsMap = new Map();
+    const constList = [];
     let errors = 0;
     let pathsNotFound = 0;
 
@@ -130,26 +158,118 @@ export default function App() {
       const totalVotes = constData.totalVotes;
       if (totalVotes <= 0) { errors++; continue; }
 
+      // Baseline vote shares per party
+      const basePcts = parties.map((_, pi) => (constData.partyVotes?.[pi] || 0) / totalVotes * 100);
+
+      // Apply swing, clamp negatives to 0, normalize so sum = 100%
+      const clamped = basePcts.map((base, pi) => Math.max(0, base + (provinceSwings[pi] || 0)));
+      const clampedTotal = clamped.reduce((s, v) => s + v, 0);
+      const normalized = clampedTotal > 0
+        ? clamped.map(v => v / clampedTotal * 100)
+        : clamped.map(() => 0);
+
+      // Projected winner
       let maxPct = -Infinity;
       let winnerIdx = -1;
       for (let pi = 0; pi < parties.length; pi++) {
-        const partyVote = constData.partyVotes?.[pi] || 0;
-        const baselinePct = (partyVote / totalVotes) * 100;
-        const finalPct = baselinePct + (provinceSwings[pi] || 0);
-        if (finalPct > maxPct) { maxPct = finalPct; winnerIdx = pi; }
+        if (normalized[pi] > maxPct) { maxPct = normalized[pi]; winnerIdx = pi; }
       }
+
+      // Previous winner (2024 baseline)
+      let prevMax = -Infinity;
+      let prevWinnerIdx = 0;
+      for (let pi = 0; pi < parties.length; pi++) {
+        if (basePcts[pi] > prevMax) { prevMax = basePcts[pi]; prevWinnerIdx = pi; }
+      }
+
+      const currWinner = winnerIdx !== -1 ? parties[winnerIdx] : '—';
+      const currWinnerColor = winnerIdx !== -1 ? partyColors[winnerIdx] : '888888';
+
+      // Top 5 parties by projected normalized share (computed once, used by both tooltip and list)
+      const partyData = parties
+        .map((name, pi) => ({
+          name,
+          newPct: normalized[pi],
+          swing: normalized[pi] - basePcts[pi],
+          color: partyColors[pi],
+        }))
+        .filter(e => e.newPct > 0)
+        .sort((a, b) => b.newPct - a.newPct)
+        .slice(0, 5);
+
+      // Always add to constituency list
+      constList.push({
+        id: constData.id,
+        province: constData.province,
+        prevWinner: parties[prevWinnerIdx],
+        prevWinnerColor: partyColors[prevWinnerIdx],
+        currWinner,
+        currWinnerColor,
+        partyData,
+      });
 
       const pathElement = svgMap.getElementById(`path${pathIdNum}`);
       if (pathElement) {
-        pathElement.style.fill = (winnerIdx !== -1 && partyColors[winnerIdx])
+        const fillColor = (winnerIdx !== -1 && partyColors[winnerIdx])
           ? `#${partyColors[winnerIdx]}`
           : defaultFillColor;
-        if (winnerIdx !== -1) newSeats[winnerIdx] += 1;
+        pathElement.style.fill = fillColor;
+        fillsMap.set(`path${pathIdNum}`, fillColor);
+
+        if (winnerIdx !== -1) {
+          newSeats[winnerIdx] += 1;
+          if (seatsByProvince[province]) seatsByProvince[province][winnerIdx] += 1;
+        }
+
+        tooltipDataMap.set(`path${pathIdNum}`, {
+          id: constData.id,
+          province: constData.province,
+          prevWinner: parties[prevWinnerIdx],
+          prevWinnerColor: partyColors[prevWinnerIdx],
+          currWinner,
+          currWinnerColor,
+          partyData,
+        });
       } else {
         pathsNotFound++;
         errors++;
       }
     }
+
+    // Attach hover event delegation to SVG (replace previous listeners)
+    tooltipDataMapRef.current = tooltipDataMap;
+    if (svgListenersRef.current.move) svgMap.removeEventListener('mousemove', svgListenersRef.current.move);
+    if (svgListenersRef.current.leave) svgMap.removeEventListener('mouseleave', svgListenersRef.current.leave);
+
+    function onMove(e) {
+      if (e.buttons & 1) {
+        setTooltip(prev => prev.visible ? { ...prev, visible: false } : prev);
+        return;
+      }
+      const target = e.target;
+      if (target.tagName !== 'path') {
+        setTooltip(prev => prev.visible ? { ...prev, visible: false } : prev);
+        return;
+      }
+      const data = tooltipDataMapRef.current?.get(target.id);
+      if (data) {
+        setTooltip({ visible: true, ...data, x: e.clientX, y: e.clientY });
+      } else {
+        setTooltip(prev => prev.visible ? { ...prev, visible: false } : prev);
+      }
+    }
+
+    function onLeave() {
+      setTooltip(prev => prev.visible ? { ...prev, visible: false } : prev);
+    }
+
+    svgMap.addEventListener('mousemove', onMove);
+    svgMap.addEventListener('mouseleave', onLeave);
+    svgListenersRef.current = { move: onMove, leave: onLeave };
+
+    setMapFills(fillsMap);
+    setProvinceSeats({ ...seatsByProvince });
+    setConstituencyList(constList);
 
     const msg = `Map updated! Processed: ${constituencyResultsData.length - errors}.` +
       (pathsNotFound > 0 ? ` Paths not found: ${pathsNotFound}.` : '');
@@ -210,6 +330,7 @@ export default function App() {
 
   return (
     <>
+      <Tooltip tooltip={tooltip} />
       <button className="theme-toggle" onClick={() => setDarkMode(d => !d)}>
         <FontAwesomeIcon icon={darkMode ? faSun : faMoon} />
         {darkMode ? ' Light Mode' : ' Dark Mode'}
@@ -217,19 +338,76 @@ export default function App() {
       <img src={logoSvg} alt="PakPoll logo" className="logo" />
       <div className="container">
         <div className="left-panel">
-          <h2>Enter Polling Data (%)</h2>
+          <div className="polling-header">
+            <h2>Enter Polling Data (%)</h2>
+            <button className="clear-button" onClick={handleClear}>Clear</button>
+          </div>
           <PollingTable inputs={inputs} onChange={handleInputChange} />
           <div className="button-container">
             <button className="map-button" onClick={handleGenerateMap}>Generate Map</button>
-            <button className="download-button" disabled={!downloadEnabled} onClick={handleDownloadSvg}>Download SVG</button>
-            <button className="clear-button" onClick={handleClear}>Clear</button>
           </div>
           <div id="statusMessage">{status}</div>
         </div>
 
         <div className="right-panel">
-          <h2>Generated Map</h2>
-          <PakistanMap ref={mapRef} />
+          {/* Tab bar */}
+          <div className="tab-bar">
+            <button
+              className={`tab-btn${activeTab === 'map' ? ' active' : ''}`}
+              onClick={() => setActiveTab('map')}
+            >
+              Map
+            </button>
+            <button
+              className={`tab-btn${activeTab === 'list' ? ' active' : ''}`}
+              onClick={() => setActiveTab('list')}
+            >
+              Constituencies
+            </button>
+          </div>
+
+          {/* Map tab — keep mounted so colors/zoom survive tab switches */}
+          <div style={{ display: activeTab === 'map' ? 'block' : 'none' }}>
+            <div className="map-wrapper">
+              <PakistanMap ref={mapRef} />
+
+              {/* Zoom controls — top-right */}
+              <div className="zoom-controls">
+                <button className="zoom-btn" title="Zoom in"
+                  onClick={() => mapRef.current?.zoomBy(0.75)}>
+                  <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
+                </button>
+                <button className="zoom-btn" title="Zoom out"
+                  onClick={() => mapRef.current?.zoomBy(1.33)}>
+                  <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
+                </button>
+                <button className="zoom-btn" title="Reset zoom"
+                  onClick={() => mapRef.current?.resetZoom()}>
+                  <FontAwesomeIcon icon={faExpand} />
+                </button>
+                <button className="zoom-btn" title="Download SVG"
+                  disabled={!downloadEnabled} onClick={handleDownloadSvg}>
+                  <FontAwesomeIcon icon={faDownload} />
+                </button>
+              </div>
+
+              {/* Mini-map — bottom-right */}
+              <MiniMap
+                currentViewBox={currentViewBox}
+                origViewBox={origViewBox}
+                fills={mapFills}
+              />
+            </div>
+          </div>
+
+          {/* Constituencies tab */}
+          <div style={{ display: activeTab === 'list' ? 'block' : 'none' }}>
+            <ConstituencyList data={constituencyList} />
+          </div>
+
+          {/* Donut chart + province toggles + seat totals — always visible */}
+          <DonutChart seats={seats} parties={parties} partyColors={partyColors} />
+
           <h3>
             Show:{' '}
             <ul className="prov-list">
@@ -246,8 +424,8 @@ export default function App() {
               ))}
             </ul>
           </h3>
-          <h2 id="test">Seat Totals</h2>
-          <ResultsTable seats={seats} />
+          <h2>Seat Totals</h2>
+          <ResultsTable seats={seats} provinceSeats={provinceSeats} />
         </div>
       </div>
     </>

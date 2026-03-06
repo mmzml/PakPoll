@@ -103,6 +103,20 @@ h2, h3 {
     color: var(--text);
 }
 
+.polling-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.polling-header h2 {
+    margin: 0;
+    flex: 1;
+    text-align: center;
+}
+
 .polling-table, .results-table {
     width: 100%;
     border-collapse: collapse;
@@ -181,6 +195,8 @@ h2, h3 {
 
 .clear-button {
     background-color: #861111;
+    padding: 5px 12px;
+    font-size: 0.8em;
 }
 
 .map-button:hover {
@@ -238,6 +254,330 @@ h2, h3 {
     min-height: 1.2em;
     margin-top: 5px;
 }
+
+/* ── Tab bar ── */
+.tab-bar {
+    display: flex;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 0;
+    width: 100%;
+    max-width: 1199px;
+}
+
+.tab-btn {
+    padding: 8px 22px;
+    background: var(--table-row-bg);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    color: var(--text);
+    font-size: 0.9em;
+    cursor: pointer;
+    margin-right: 4px;
+    transition: background-color 0.15s;
+}
+
+.tab-btn:hover {
+    background: var(--table-head-bg);
+}
+
+.tab-btn.active {
+    background: var(--panel-bg);
+    border-bottom: 2px solid var(--panel-bg);
+    margin-bottom: -2px;
+    font-weight: bold;
+}
+
+/* ── Constituency list tab ── */
+.const-list-wrap {
+    width: 1199px;
+    height: 800px;
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-top: none;
+}
+
+.const-list-empty {
+    width: 1199px;
+    height: 800px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--status-color);
+    font-style: italic;
+    font-size: 1em;
+    border: 1px solid var(--border);
+    border-top: none;
+}
+
+.const-list-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82em;
+}
+
+.const-list-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--table-head-bg);
+    color: var(--text);
+    border: 1px solid var(--table-border);
+    padding: 7px 10px;
+    text-align: left;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.const-list-table tbody td {
+    border: 1px solid var(--table-border);
+    padding: 5px 10px;
+    color: var(--text);
+    background: var(--panel-bg);
+    vertical-align: top;
+}
+
+.const-list-table tbody tr:nth-child(even) td {
+    background: var(--table-row-bg);
+}
+
+.const-id {
+    white-space: nowrap;
+    font-weight: bold;
+}
+
+.const-party-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.const-party-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.const-party-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1px solid rgba(128,128,128,0.3);
+}
+
+.const-party-name {
+    width: 68px;
+    flex-shrink: 0;
+}
+
+.const-party-pct {
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.const-party-swing {
+    width: 44px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* ── Map wrapper (positions overlays relative to the map) ── */
+.map-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+/* ── Zoom controls ── */
+.zoom-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 100;
+}
+
+.zoom-btn {
+    width: 32px;
+    height: 32px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-size: 0.85em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    transition: background-color 0.15s;
+}
+
+.zoom-btn:hover {
+    background: var(--table-head-bg);
+}
+
+.zoom-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Shared legend dot (used by DonutChart) ── */
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1px solid rgba(128,128,128,0.3);
+}
+
+/* ── Donut chart ── */
+.donut-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 12px 0 4px;
+    width: 100%;
+    max-width: 560px;
+}
+
+.donut-svg-wrap {
+    flex-shrink: 0;
+    color: var(--text);
+}
+
+.donut-legend {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 160px;
+    overflow-y: auto;
+    font-size: 0.82em;
+    padding-top: 4px;
+}
+
+.donut-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text);
+}
+
+.donut-legend-name {
+    flex: 1;
+}
+
+.donut-legend-count {
+    font-weight: bold;
+    color: var(--text);
+}
+
+/* ── Mini-map ── */
+.mini-map {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 220px;
+    height: 128px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    overflow: hidden;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.mini-map-svg-wrap {
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.mini-map-svg-wrap svg {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+    pointer-events: none;
+}
+
+.mini-map-viewport {
+    position: absolute;
+    border: 2px solid rgba(0, 80, 200, 0.85);
+    background: rgba(0, 80, 200, 0.12);
+    pointer-events: none;
+}
+
+/* ── Constituency hover tooltip ── */
+.map-tooltip {
+    position: fixed;
+    background: rgba(255, 255, 255, 0.97);
+    color: #111;
+    border: 1px solid #bbb;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.78em;
+    pointer-events: none;
+    z-index: 9999;
+    min-width: 200px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.tooltip-title {
+    font-weight: bold;
+    font-size: 1em;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #ccc;
+}
+
+.tooltip-prev-winner {
+    margin-bottom: 2px;
+}
+
+.tooltip-curr-winner {
+    margin-bottom: 6px;
+}
+
+.tooltip-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tooltip-table th {
+    text-align: left;
+    color: #666;
+    font-weight: normal;
+    padding: 1px 4px 3px;
+    border-bottom: 1px solid #ccc;
+    background: transparent;
+}
+
+.tooltip-table td {
+    padding: 2px 4px;
+    background: transparent;
+    border: none;
+    color: #111;
+}
+
+.tooltip-color-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    flex-shrink: 0;
+}
+
+.swing-pos { color: #28a745; }
+.swing-neg { color: #dc3545; }
+.swing-zero { color: #111; }
 
 /* Basic responsiveness */
 @media (max-width: 900px) {
