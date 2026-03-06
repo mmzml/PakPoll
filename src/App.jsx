@@ -18,6 +18,7 @@ import logoSvg from './assets/logo.svg';
 import './App.css';
 
 const initialInputs = parties.map(() => provinces.map(() => ''));
+const initialProvinceSeats = Object.fromEntries(provinces.map(p => [p, new Array(parties.length).fill(0)]));
 
 const provinceCheckboxes = [
   { id: 'kpk', label: 'KPK', key: 'KPK' },
@@ -47,7 +48,7 @@ export default function App() {
 
   const [inputs, setInputs] = useState(initialInputs);
   const [seats, setSeats] = useState([...startingSeats]);
-  const [provinceSeats, setProvinceSeats] = useState(null);
+  const [provinceSeats, setProvinceSeats] = useState(initialProvinceSeats);
   const [constituencyList, setConstituencyList] = useState(null);
   const [activeTab, setActiveTab] = useState('map');
   const [status, setStatus] = useState("Enter polling data and click 'Generate Map'.");
@@ -342,7 +343,9 @@ export default function App() {
             <h2>Enter Polling Data (%)</h2>
             <button className="clear-button" onClick={handleClear}>Clear</button>
           </div>
-          <PollingTable inputs={inputs} onChange={handleInputChange} />
+          <div style={{ overflowX: 'auto', width: '100%' }}>
+            <PollingTable inputs={inputs} onChange={handleInputChange} />
+          </div>
           <div className="button-container">
             <button className="map-button" onClick={handleGenerateMap}>Generate Map</button>
           </div>

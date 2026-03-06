@@ -63,7 +63,7 @@ const PakistanMap = memo(forwardRef(function PakistanMap(props, ref) {
     const svgSize = { w: svgMap.clientWidth, h: svgMap.clientHeight };
     let isPanning = false;
     let startPoint = { x: 0, y: 0 };
-    let scale = 1;
+    let scale = svgSize.w / viewBox.w;
 
     function applyVB(newVB) {
       viewBox = newVB;
@@ -110,11 +110,42 @@ const PakistanMap = memo(forwardRef(function PakistanMap(props, ref) {
       isPanning = false;
     }
 
+    function onTouchStart(e) {
+      if (e.touches.length !== 1) return;
+      isPanning = true;
+      startPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+
+    function onTouchMove(e) {
+      if (!isPanning || e.touches.length !== 1) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      const dx = (startPoint.x - t.clientX) / scale;
+      const dy = (startPoint.y - t.clientY) / scale;
+      const moved = { x: viewBox.x + dx, y: viewBox.y + dy, w: viewBox.w, h: viewBox.h };
+      svgMap.setAttribute('viewBox', `${moved.x} ${moved.y} ${moved.w} ${moved.h}`);
+      viewBoxCallbackRef.current?.(moved);
+    }
+
+    function onTouchEnd(e) {
+      if (!isPanning) return;
+      isPanning = false;
+      if (e.changedTouches.length > 0) {
+        const t = e.changedTouches[0];
+        const dx = (startPoint.x - t.clientX) / scale;
+        const dy = (startPoint.y - t.clientY) / scale;
+        applyVB({ x: viewBox.x + dx, y: viewBox.y + dy, w: viewBox.w, h: viewBox.h });
+      }
+    }
+
     container.addEventListener('wheel', onWheel, { passive: false });
     container.addEventListener('mousedown', onMouseDown);
     container.addEventListener('mousemove', onMouseMove);
     container.addEventListener('mouseup', onMouseUp);
     container.addEventListener('mouseleave', onMouseLeave);
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchend', onTouchEnd);
 
     return () => {
       container.removeEventListener('wheel', onWheel);
@@ -122,6 +153,9 @@ const PakistanMap = memo(forwardRef(function PakistanMap(props, ref) {
       container.removeEventListener('mousemove', onMouseMove);
       container.removeEventListener('mouseup', onMouseUp);
       container.removeEventListener('mouseleave', onMouseLeave);
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchend', onTouchEnd);
     };
   }, []);
 

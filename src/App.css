@@ -227,6 +227,7 @@ h2, h3 {
     justify-content: center;
     align-items: center;
     overflow: auto;
+    touch-action: none;
 }
 
 .map-viewer svg {
@@ -579,7 +580,7 @@ h2, h3 {
 .swing-neg { color: #dc3545; }
 .swing-zero { color: #111; }
 
-/* Basic responsiveness */
+/* ── Mobile responsiveness ── */
 @media (max-width: 900px) {
     .container {
         flex-direction: column;
@@ -587,16 +588,24 @@ h2, h3 {
         gap: 20px;
     }
 
-    .right-panel {
-        border-left: none;
-        border-top: 1px solid #ccc;
-        padding-left: 0;
-        padding-top: 20px;
-    }
-
     .left-panel, .right-panel {
         flex-basis: auto;
         max-width: none;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .right-panel {
+        border-left: none;
+        border-top: 1px solid var(--border);
+        padding-left: 0;
+        padding-top: 20px;
+        align-items: stretch;
+    }
+
+    /* Map container */
+    .map-wrapper {
+        width: 100%;
     }
 
     .map-viewer {
@@ -604,15 +613,36 @@ h2, h3 {
         height: 60vh;
     }
 
+    /* Tab bar and constituency list */
+    .tab-bar {
+        max-width: 100%;
+    }
+
+    .const-list-wrap,
+    .const-list-empty {
+        width: 100%;
+        height: 60vh;
+    }
+
+    /* Shrink mini-map so it doesn't crowd the map on small screens */
+    .mini-map {
+        width: 150px;
+        height: 87px;
+    }
+
+    /* Donut chart */
+    .donut-container {
+        max-width: 100%;
+    }
+
+    /* Generate Map button */
     .button-container {
         flex-direction: column;
-        /* Stack buttons vertically on small screens */
         align-items: center;
     }
 
-    .map-button, .download-button {
+    .map-button {
         width: 80%;
-        /* Make buttons wider */
         max-width: 300px;
     }
 }
