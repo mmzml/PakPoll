@@ -1,7 +1,7 @@
 export const provinces = ['KPK', 'Punjab', 'Sindh', 'Balochistan'];
 export const parties = ['PTI', 'PMLN', 'PPP', 'TLP', 'JUIF', 'ANP', 'IPP', 'PMLQ', 'PMLZ', 'BAP', 'BNPM', 'MQMP', 'MWM', 'MQMH', 'BNPA', 'JI', 'AML', 'JWP', 'NDM', 'NP', 'PMAP', 'PNAP', 'PTIP', 'QWP', 'PRHP', 'AWP', 'GDA', 'WPG', 'HDTB', 'HDP', 'IND/OTH'];
 
-export const partyColors = ["e70a0a", "228b22", "000000", "b3ff80", "003800", "550000", "67ba27", "00ff00", "008080", "6b8e23", "ffef00", "ffcd00", "800080", "ffc0cb", "008080", "3771c8", "d2691e", "4682b4", "a0522d", "cd5c5c", "ff6600", "b380ff", "fa8072", "b0c4de", "fa8072", "7fffd4", "0000ff", "ffff00", "0000cc", "ff00ff", "808080"];
+export const partyColors = ["e70a0a", "228b22", "000000", "b3ff80", "003800", "550000", "67ba27", "00ff00", "008080", "6b8e23", "ffef00", "ffcd00", "800080", "ffc0cb", "008080", "3771c8", "d2691e", "4682b4", "a0522d", "cd5c5c", "ff6600", "b380ff", "fa8072", "b0c4de", "b59410", "7fffd4", "0000ff", "ffff00", "0000cc", "ff00ff", "808080"];
 
 export const defaultFillColor = "#eeeeee";
 

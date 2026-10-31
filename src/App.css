@@ -323,6 +323,64 @@ h2, h3 {
     text-align: center;
     min-height: 1.2em;
     margin-top: 5px;
+    padding: 6px 10px;
+    border-radius: 5px;
+    border-left: 4px solid transparent;
+}
+
+#statusMessage.status-success {
+    border-left-color: #28a745;
+    background-color: rgba(40, 167, 69, 0.1);
+}
+
+#statusMessage.status-warning {
+    border-left-color: #e0a800;
+    background-color: rgba(224, 168, 0, 0.12);
+}
+
+#statusMessage.status-error {
+    border-left-color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.12);
+}
+
+/* Live per-province totals under the polling table */
+.polling-table tfoot td {
+    font-weight: bold;
+    background-color: var(--table-head-bg);
+}
+
+.polling-table tfoot td.total-cell.ok {
+    color: #28a745;
+}
+
+.polling-table tfoot td.total-cell.off {
+    color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.12);
+}
+
+/* Seat changes vs 2024 */
+.seat-gain {
+    color: #28a745 !important;
+    font-weight: bold;
+}
+
+.seat-loss {
+    color: #dc3545 !important;
+    font-weight: bold;
+}
+
+.donut-legend-change {
+    font-size: 0.9em;
+    min-width: 2.5em;
+    text-align: right;
+}
+
+.majority-summary {
+    width: 100%;
+    max-width: 560px;
+    margin: 4px 0 8px;
+    font-size: 0.9em;
+    color: var(--text);
 }
 
 /* ── Tab bar ── */
@@ -440,6 +498,92 @@ h2, h3 {
 .const-party-name {
     width: 68px;
     flex-shrink: 0;
+}
+
+.const-row {
+    cursor: pointer;
+}
+
+/* Matches the specificity of the striped-row rule so hover works on every row */
+.const-list-table tbody tr.const-row:hover td {
+    background-color: var(--table-head-bg);
+}
+
+/* ── Constituency filter ── */
+.const-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-top: none;
+    background: var(--panel-bg);
+}
+
+.const-filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.const-filter-btn {
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    background: var(--panel-bg);
+    color: var(--text);
+    font-size: 0.85em;
+    cursor: pointer;
+}
+
+.const-filter-btn.active {
+    background: #007bff;
+    border-color: #007bff;
+    color: white;
+}
+
+.const-flows {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 0.8em;
+}
+
+.const-flow {
+    padding: 2px 8px;
+    border: 1px solid var(--table-border);
+    border-radius: 10px;
+    background: var(--table-row-bg);
+    color: var(--text);
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.const-flow-count {
+    margin-left: 6px;
+    color: var(--text);
+}
+
+.const-list-none {
+    padding: 40px;
+    text-align: center;
+    color: var(--status-color);
+    font-style: italic;
+}
+
+.const-id-link {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: bold;
+    color: #007bff;
+    text-align: left;
+    cursor: pointer;
+}
+
+.const-id-link:hover {
+    text-decoration: underline;
 }
 
 .const-party-pct {
@@ -643,6 +787,80 @@ h2, h3 {
     vertical-align: middle;
     border: 1px solid rgba(0, 0, 0, 0.2);
     flex-shrink: 0;
+}
+
+.tooltip-margin {
+    color: #666;
+}
+
+/* ── Seat search ── */
+.seat-search {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    max-width: 420px;
+    margin-bottom: 10px;
+}
+
+.seat-search input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 10px;
+    border: 1px solid var(--input-border);
+    border-radius: 5px;
+    background-color: var(--panel-bg);
+    color: var(--text);
+    font-size: 0.9em;
+}
+
+/* ── Pinned seat panel (bottom-left of the map) ── */
+.seat-panel {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    width: 240px;
+    max-width: calc(100% - 20px);
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.97);
+    color: #111;
+    border: 1px solid #bbb;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.78em;
+    z-index: 150;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.seat-panel .tooltip-title {
+    padding-right: 22px; /* room for the close button */
+}
+
+.seat-panel-close {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: #555;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.seat-panel-close:hover {
+    background: #eee;
+}
+
+.seat-panel-empty {
+    color: #555;
+}
+
+/* !important beats the stroke-width set inline on each path in the SVG file */
+#pakistanMapSvg path.seat-selected {
+    stroke: #000 !important;
+    stroke-width: 2.5px !important;
+    vector-effect: non-scaling-stroke;
 }
 
 .swing-pos { color: #28a745; }

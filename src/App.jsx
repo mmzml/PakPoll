@@ -1,10 +1,14 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSun, faMoon, faMagnifyingGlassPlus, faMagnifyingGlassMinus, faExpand, faDownload } from '@fortawesome/free-solid-svg-icons';
+import {
+  faSun, faMoon, faMagnifyingGlassPlus, faMagnifyingGlassMinus, faExpand, faDownload,
+  faImage, faFileCsv, faMagnifyingGlass,
+} from '@fortawesome/free-solid-svg-icons';
 import PakistanMap from './components/PakistanMap';
 import PollingTable from './components/PollingTable';
 import ResultsTable from './components/ResultsTable';
 import Tooltip from './components/Tooltip';
+import SeatPanel from './components/SeatPanel';
 import MiniMap from './components/MiniMap';
 import DonutChart from './components/DonutChart';
 import ConstituencyList from './components/ConstituencyList';
@@ -14,6 +18,8 @@ import {
   const_to_path_id, const_to_text_id, provinceElements,
 } from './data/constants';
 import { constituencyResultsData } from './data/constituencyData';
+import { projectSeats } from './utils/projection';
+import { downloadBlob, exportMapSvg, exportMapPng, buildResultsCsv } from './utils/exportMap';
 import logoSvg from './assets/logo.svg';
 import './App.css';
 
@@ -27,6 +33,52 @@ const provinceCheckboxes = [
   { id: 'bal', label: 'Balochistan', key: 'Balochistan' },
   { id: 'kas', label: 'Kashmir & GB', key: 'Kashmir' },
 ];
+
+// Constituency id ("NA-1 Chitral") <-> SVG path id ("path1639")
+const seatPathIds = new Map(constituencyResultsData.map((c, i) => [c.id, `path${const_to_path_id[i]}`]));
+const pathSeatIds = new Map([...seatPathIds].map(([seat, path]) => [path, seat]));
+const seatIds = [...seatPathIds.keys()];
+
+// Accepts "125", "NA125", "na-125" or part of a name like "lahore"
+function findSeat(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return null;
+  const num = q.match(/^(?:na\s*-?\s*)?(\d+)$/);
+  if (num) return seatIds.find(id => id.match(/^NA-(\d+)/i)?.[1] === String(Number(num[1]))) ?? null;
+  return seatIds.find(id => id.toLowerCase() === q)
+    ?? seatIds.find(id => id.toLowerCase().includes(q))
+    ?? null;
+}
+
+function describeResult(seats) {
+  const total = seats.reduce((s, v) => s + v, 0);
+  const majority = Math.floor(total / 2) + 1;
+  const leaderIdx = seats.indexOf(Math.max(...seats));
+  const count = seats[leaderIdx];
+  return count >= majority
+    ? `${parties[leaderIdx]} wins a majority with ${count} seats (${majority} needed)`
+    : `Hung parliament: ${parties[leaderIdx]} largest with ${count} seats, ${majority - count} short of a majority`;
+}
+
+// Resolve the table into numbers per province; empty cells fall back to the 2024 baseline.
+function getPollingInput(inputs) {
+  const data = {};
+  provinces.forEach((province, prov) => {
+    data[province] = parties.map((_, pi) => {
+      const value = inputs[pi][prov].trim();
+      const parsed = parseFloat(value !== '' ? value : baselineProvincialPct[province][pi] ?? 0);
+      return isNaN(parsed) ? 0 : parsed;
+    });
+  });
+  return data;
+}
+
+function getProvinceTotals(pollingData) {
+  return Object.fromEntries(provinces.map(province => {
+    const total = pollingData[province].reduce((s, v) => s + v, 0);
+    return [province, { total, valid: total >= 99 && total <= 101 }];
+  }));
+}
 
 function getElementIds(provinceKey) {
   const config = provinceElements[provinceKey];
@@ -47,24 +99,49 @@ export default function App() {
   }, [darkMode]);
 
   const [inputs, setInputs] = useState(initialInputs);
-  const [seats, setSeats] = useState([...startingSeats]);
-  const [provinceSeats, setProvinceSeats] = useState(initialProvinceSeats);
-  const [constituencyList, setConstituencyList] = useState(null);
+  const [projection, setProjection] = useState(null);
   const [activeTab, setActiveTab] = useState('map');
-  const [status, setStatus] = useState("Enter polling data and click 'Generate Map'.");
-  const [downloadEnabled, setDownloadEnabled] = useState(false);
+  const [status, setStatusState] = useState({ text: "Enter polling data and click 'Generate Map'.", type: 'info' });
+  const setStatus = (text, type = 'info') => setStatusState({ text, type });
   const [provincesVisible, setProvincesVisible] = useState({
     KPK: true, Punjab: true, Sindh: true, Balochistan: true, Kashmir: true,
   });
   const [currentViewBox, setCurrentViewBox] = useState(null);
   const [origViewBox, setOrigViewBox] = useState(null);
-  const [mapFills, setMapFills] = useState(null);
   const [swingMode, setSwingMode] = useState('uniform');
+  const [selectedSeat, setSelectedSeat] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tooltip, setTooltip] = useState({ visible: false });
 
   const mapRef = useRef(null);
-  const tooltipDataMapRef = useRef(null);
-  const svgListenersRef = useRef({ move: null, leave: null });
-  const [tooltip, setTooltip] = useState({ visible: false });
+
+  const pollingData = useMemo(() => getPollingInput(inputs), [inputs]);
+  const provinceTotals = useMemo(() => getProvinceTotals(pollingData), [pollingData]);
+
+  // Everything the page shows is derived from the latest projection
+  const seats = projection?.seats ?? startingSeats;
+  const provinceSeats = projection?.seatsByProvince ?? initialProvinceSeats;
+  const constituencyList = projection?.constituencies ?? null;
+  const downloadEnabled = !!projection && projection.errors === 0 && projection.missingPaths === 0;
+
+  const seatsByPath = useMemo(
+    () => new Map((constituencyList ?? []).map(c => [c.pathId, c])),
+    [constituencyList],
+  );
+  const mapFills = useMemo(() => {
+    if (!constituencyList) return null;
+    return new Map(constituencyList.map(c => [
+      c.pathId,
+      c.winnerIdx !== -1 && partyColors[c.winnerIdx] ? `#${partyColors[c.winnerIdx]}` : defaultFillColor,
+    ]));
+  }, [constituencyList]);
+  const hiddenIds = useMemo(
+    () => new Set(provinceCheckboxes.filter(({ key }) => !provincesVisible[key]).flatMap(({ key }) => getElementIds(key))),
+    [provincesVisible],
+  );
+
+  const selectedPathId = selectedSeat ? seatPathIds.get(selectedSeat) : null;
+  const selectedSeatData = selectedPathId ? seatsByPath.get(selectedPathId) : null;
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -74,6 +151,21 @@ export default function App() {
       setCurrentViewBox({ ...orig });
     }
     mapRef.current.subscribeViewBox(vb => setCurrentViewBox({ ...vb }));
+  }, []);
+
+  const handleSeatHover = useCallback((pathId, e) => {
+    const data = pathId && seatsByPath.get(pathId);
+    if (data) {
+      setTooltip({ visible: true, ...data, x: e.clientX, y: e.clientY });
+    } else {
+      setTooltip(prev => prev.visible ? { ...prev, visible: false } : prev);
+    }
+  }, [seatsByPath]);
+
+  // Clicking (or tapping) a seat pins its details
+  const handleSeatClick = useCallback(pathId => {
+    const seat = pathSeatIds.get(pathId);
+    if (seat) setSelectedSeat(seat);
   }, []);
 
   function handleInputChange(partyIdx, provIdx, value) {
@@ -88,259 +180,96 @@ export default function App() {
     setInputs(initialInputs.map(row => [...row]));
   }
 
-  function getPollingInput() {
-    const data = {};
-    provinces.forEach(p => { data[p] = []; });
-
-    for (let pi = 0; pi < parties.length; pi++) {
-      for (let prov = 0; prov < provinces.length; prov++) {
-        const value = inputs[pi][prov].trim();
-        const placeholderEl = document.querySelector(
-          `#pollingTable tbody tr:nth-child(${pi + 1}) td:nth-child(${prov + 2}) input`
-        );
-        const placeholder = placeholderEl ? placeholderEl.placeholder : '0';
-        const finalStr = value !== '' ? value : placeholder;
-        const finalValue = parseFloat(finalStr);
-        data[provinces[prov]].push(isNaN(finalValue) ? 0 : finalValue);
-      }
-    }
-
-    for (const province of provinces) {
-      const total = data[province].reduce((s, v) => s + v, 0);
-      if (total > 101 || total < 99) {
-        console.warn(`Input Warning: Total % for ${province} is ${total.toFixed(1)}%.`);
-      }
-    }
-    return data;
-  }
-
-  // Each swing entry holds the additive change (uniform) and the multiplicative ratio (proportional).
-  // ratio is null when the party had no baseline share, since a ratio can't be applied to 0.
-  function calculateSwings(userInputData) {
-    const swings = {};
-    provinces.forEach(province => {
-      swings[province] = [];
-      for (let i = 0; i < parties.length; i++) {
-        const userPct = userInputData[province][i];
-        const baselinePct = baselineProvincialPct[province][i] ?? 0;
-        swings[province].push({
-          diff: userPct - baselinePct,
-          ratio: baselinePct > 0 ? userPct / baselinePct : null,
-        });
-      }
-    });
-    return swings;
-  }
-
-  function applySwing(base, swing, mode) {
-    if (!swing) return base;
-    // Proportional: scale the constituency share by the provincial ratio.
-    // Falls back to uniform for parties with no provincial baseline.
-    if (mode === 'proportional' && swing.ratio !== null) return base * swing.ratio;
-    return base + swing.diff;
-  }
-
-  function applySwingsAndColorMap(swings, mode) {
-    const svgMap = mapRef.current?.getSvg();
-    if (!svgMap) {
-      setStatus('Error: SVG map not found.');
-      return false;
-    }
-
-    svgMap.querySelectorAll('path[id^="path"]').forEach(path => {
-      path.style.fill = defaultFillColor;
-    });
-
-    const newSeats = new Array(parties.length).fill(0);
-    const seatsByProvince = {};
-    provinces.forEach(p => { seatsByProvince[p] = new Array(parties.length).fill(0); });
-
-    const tooltipDataMap = new Map();
-    const fillsMap = new Map();
-    const constList = [];
-    let errors = 0;
-    let pathsNotFound = 0;
-
-    for (let i = 0; i < constituencyResultsData.length; i++) {
-      const constData = constituencyResultsData[i];
-      const pathIdNum = const_to_path_id[i];
-      if (!constData || pathIdNum === undefined) { errors++; continue; }
-
-      const province = constData.province;
-      const provinceSwings = swings[province];
-      if (!provinceSwings) { errors++; continue; }
-
-      const totalVotes = constData.totalVotes;
-      if (totalVotes <= 0) { errors++; continue; }
-
-      // Baseline vote shares per party
-      const basePcts = parties.map((_, pi) => (constData.partyVotes?.[pi] || 0) / totalVotes * 100);
-
-      // Apply swing, clamp negatives to 0, normalize so sum = 100%
-      const clamped = basePcts.map((base, pi) => Math.max(0, applySwing(base, provinceSwings[pi], mode)));
-      const clampedTotal = clamped.reduce((s, v) => s + v, 0);
-      const normalized = clampedTotal > 0
-        ? clamped.map(v => v / clampedTotal * 100)
-        : clamped.map(() => 0);
-
-      // Projected winner
-      let maxPct = -Infinity;
-      let winnerIdx = -1;
-      for (let pi = 0; pi < parties.length; pi++) {
-        if (normalized[pi] > maxPct) { maxPct = normalized[pi]; winnerIdx = pi; }
-      }
-
-      // Previous winner (2024 baseline)
-      let prevMax = -Infinity;
-      let prevWinnerIdx = 0;
-      for (let pi = 0; pi < parties.length; pi++) {
-        if (basePcts[pi] > prevMax) { prevMax = basePcts[pi]; prevWinnerIdx = pi; }
-      }
-
-      const currWinner = winnerIdx !== -1 ? parties[winnerIdx] : '—';
-      const currWinnerColor = winnerIdx !== -1 ? partyColors[winnerIdx] : '888888';
-
-      // Top 5 parties by projected normalized share (computed once, used by both tooltip and list)
-      const partyData = parties
-        .map((name, pi) => ({
-          name,
-          newPct: normalized[pi],
-          swing: normalized[pi] - basePcts[pi],
-          color: partyColors[pi],
-        }))
-        .filter(e => e.newPct > 0)
-        .sort((a, b) => b.newPct - a.newPct)
-        .slice(0, 5);
-
-      // Always add to constituency list
-      constList.push({
-        id: constData.id,
-        province: constData.province,
-        prevWinner: parties[prevWinnerIdx],
-        prevWinnerColor: partyColors[prevWinnerIdx],
-        currWinner,
-        currWinnerColor,
-        partyData,
-      });
-
-      const pathElement = svgMap.getElementById(`path${pathIdNum}`);
-      if (pathElement) {
-        const fillColor = (winnerIdx !== -1 && partyColors[winnerIdx])
-          ? `#${partyColors[winnerIdx]}`
-          : defaultFillColor;
-        pathElement.style.fill = fillColor;
-        fillsMap.set(`path${pathIdNum}`, fillColor);
-
-        if (winnerIdx !== -1) {
-          newSeats[winnerIdx] += 1;
-          if (seatsByProvince[province]) seatsByProvince[province][winnerIdx] += 1;
-        }
-
-        tooltipDataMap.set(`path${pathIdNum}`, {
-          id: constData.id,
-          province: constData.province,
-          prevWinner: parties[prevWinnerIdx],
-          prevWinnerColor: partyColors[prevWinnerIdx],
-          currWinner,
-          currWinnerColor,
-          partyData,
-        });
-      } else {
-        pathsNotFound++;
-        errors++;
-      }
-    }
-
-    // Attach hover event delegation to SVG (replace previous listeners)
-    tooltipDataMapRef.current = tooltipDataMap;
-    if (svgListenersRef.current.move) svgMap.removeEventListener('mousemove', svgListenersRef.current.move);
-    if (svgListenersRef.current.leave) svgMap.removeEventListener('mouseleave', svgListenersRef.current.leave);
-
-    function onMove(e) {
-      if (e.buttons & 1) {
-        setTooltip(prev => prev.visible ? { ...prev, visible: false } : prev);
-        return;
-      }
-      const target = e.target;
-      if (target.tagName !== 'path') {
-        setTooltip(prev => prev.visible ? { ...prev, visible: false } : prev);
-        return;
-      }
-      const data = tooltipDataMapRef.current?.get(target.id);
-      if (data) {
-        setTooltip({ visible: true, ...data, x: e.clientX, y: e.clientY });
-      } else {
-        setTooltip(prev => prev.visible ? { ...prev, visible: false } : prev);
-      }
-    }
-
-    function onLeave() {
-      setTooltip(prev => prev.visible ? { ...prev, visible: false } : prev);
-    }
-
-    svgMap.addEventListener('mousemove', onMove);
-    svgMap.addEventListener('mouseleave', onLeave);
-    svgListenersRef.current = { move: onMove, leave: onLeave };
-
-    setMapFills(fillsMap);
-    setProvinceSeats({ ...seatsByProvince });
-    setConstituencyList(constList);
-
-    const msg = `Map updated! Processed: ${constituencyResultsData.length - errors}.` +
-      (pathsNotFound > 0 ? ` Paths not found: ${pathsNotFound}.` : '');
-    setStatus(msg.trim());
-    setSeats(newSeats);
-    if (pathsNotFound > 0) {
-      alert(`Warning: ${pathsNotFound} SVG path elements could not be found.`);
-    }
-    return errors === 0;
-  }
-
-  function handleGenerateMap() {
+  function handleGenerateMap(mode = swingMode) {
     setStatus('Processing...');
-    setDownloadEnabled(false);
     setTimeout(() => {
       try {
-        const userInput = getPollingInput();
-        const swings = calculateSwings(userInput);
-        const success = applySwingsAndColorMap(swings, swingMode);
-        setDownloadEnabled(success);
+        const result = projectSeats(pollingData, mode);
+        const missingPaths = result.constituencies.filter(c => !mapRef.current?.hasElement(c.pathId)).length;
+        setProjection({ ...result, missingPaths });
+
+        const offProvinces = provinces.filter(p => !provinceTotals[p].valid);
+        let msg = `Map updated using ${mode} swing. Processed: ${result.constituencies.length}.`;
+        if (missingPaths > 0) msg += ` Warning: ${missingPaths} map areas could not be found.`;
+        if (offProvinces.length > 0) {
+          msg += ` Note: ${offProvinces.map(p => `${p} totals ${provinceTotals[p].total.toFixed(1)}%`).join(', ')}, so shares were rescaled to 100%.`;
+        }
+        setStatus(msg, missingPaths > 0 || offProvinces.length > 0 ? 'warning' : 'success');
       } catch (err) {
         console.error(err);
-        setStatus('An unexpected error occurred. Check console (F12).');
-        setDownloadEnabled(false);
+        setStatus('An unexpected error occurred. Check console (F12).', 'error');
       }
     }, 50);
   }
 
+  // Once a map exists, switching swing model redraws it straight away
+  function handleSwingModeChange(mode) {
+    setSwingMode(mode);
+    if (projection) handleGenerateMap(mode);
+  }
+
+  function handleSearch(e) {
+    e.preventDefault();
+    const seat = findSeat(searchQuery);
+    if (!seat) {
+      setStatus(`No constituency matches "${searchQuery.trim()}".`, 'warning');
+      return;
+    }
+    setSearchQuery(seat);
+    focusSeat(seat);
+  }
+
+  // Pin a seat and zoom the map to it (used by search and the constituency list)
+  function focusSeat(seat) {
+    setSelectedSeat(seat);
+    setActiveTab('map');
+    // Wait for the map tab to be shown before measuring the seat
+    requestAnimationFrame(() => mapRef.current?.zoomToElement(seatPathIds.get(seat)));
+  }
+
   function handleDownloadSvg() {
     const svgMap = mapRef.current?.getSvg();
-    if (!svgMap) { alert('Error: Cannot find the SVG map element.'); return; }
+    if (!svgMap || !origViewBox) { setStatus('Error: Cannot find the SVG map element.', 'error'); return; }
     try {
-      const blob = new Blob([svgMap.outerHTML], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'pakistan_polling_map_generated.svg';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(exportMapSvg(svgMap, origViewBox), 'pakistan_polling_map_generated.svg');
       setStatus('SVG download started.');
     } catch (err) {
       console.error(err);
-      setStatus('SVG download failed.');
+      setStatus('SVG download failed.', 'error');
     }
+  }
+
+  async function handleDownloadPng() {
+    const svgMap = mapRef.current?.getSvg();
+    if (!svgMap || !origViewBox) { setStatus('Error: Cannot find the SVG map element.', 'error'); return; }
+    setStatus('Creating PNG...');
+    try {
+      const legend = parties
+        .map((name, i) => ({ name, color: partyColors[i], count: seats[i], change: seats[i] - startingSeats[i] }))
+        .filter(p => p.count > 0)
+        .sort((a, b) => b.count - a.count);
+      const blob = await exportMapPng(svgMap, origViewBox, {
+        title: 'Pakistan National Assembly projection',
+        subtitle: `${projection.mode === 'proportional' ? 'Proportional' : 'Uniform'} swing · ${describeResult(seats)} · PakPoll`,
+        legend,
+      });
+      downloadBlob(blob, `pakpoll_projection_${projection.mode}.png`);
+      setStatus('PNG download started.', 'success');
+    } catch (err) {
+      console.error(err);
+      setStatus('PNG download failed.', 'error');
+    }
+  }
+
+  function handleDownloadCsv() {
+    if (!constituencyList) return;
+    const csv = buildResultsCsv(constituencyList, parties);
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `pakpoll_results_${projection.mode}.csv`);
+    setStatus('CSV download started.', 'success');
   }
 
   function handleProvinceToggle(key, checked) {
     setProvincesVisible(prev => ({ ...prev, [key]: checked }));
-    const svgMap = mapRef.current?.getSvg();
-    if (!svgMap) return;
-    getElementIds(key).forEach(id => {
-      const el = svgMap.getElementById(id);
-      if (el) el.style.visibility = checked ? 'visible' : 'hidden';
-    });
   }
 
   return (
@@ -358,7 +287,7 @@ export default function App() {
             <button className="clear-button" onClick={handleClear}>Clear</button>
           </div>
           <div style={{ overflowX: 'auto', width: '100%' }}>
-            <PollingTable inputs={inputs} onChange={handleInputChange} />
+            <PollingTable inputs={inputs} onChange={handleInputChange} totals={provinceTotals} />
           </div>
           <div className="swing-toggle">
             <span className={swingMode === 'uniform' ? 'active' : ''}>Uniform swing</span>
@@ -366,16 +295,16 @@ export default function App() {
               <input
                 type="checkbox"
                 checked={swingMode === 'proportional'}
-                onChange={e => setSwingMode(e.target.checked ? 'proportional' : 'uniform')}
+                onChange={e => handleSwingModeChange(e.target.checked ? 'proportional' : 'uniform')}
               />
               <span className="slider" />
             </label>
             <span className={swingMode === 'proportional' ? 'active' : ''}>Proportional swing</span>
           </div>
           <div className="button-container">
-            <button className="map-button" onClick={handleGenerateMap}>Generate Map</button>
+            <button className="map-button" onClick={() => handleGenerateMap()}>Generate Map</button>
           </div>
-          <div id="statusMessage">{status}</div>
+          <div id="statusMessage" className={`status-${status.type}`} role="status">{status.text}</div>
         </div>
 
         <div className="right-panel">
@@ -395,10 +324,35 @@ export default function App() {
             </button>
           </div>
 
+          <form className="seat-search" onSubmit={handleSearch} role="search">
+            <input
+              type="search"
+              list="seat-options"
+              placeholder="Find a seat, e.g. NA-125 or Lahore"
+              aria-label="Find a constituency"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            <datalist id="seat-options">
+              {seatIds.map(id => <option key={id} value={id} />)}
+            </datalist>
+            <button type="submit" className="zoom-btn" title="Find seat">
+              <FontAwesomeIcon icon={faMagnifyingGlass} />
+            </button>
+          </form>
+
           {/* Map tab — keep mounted so colors/zoom survive tab switches */}
           <div style={{ display: activeTab === 'map' ? 'block' : 'none' }}>
             <div className="map-wrapper">
-              <PakistanMap ref={mapRef} />
+              <PakistanMap
+                ref={mapRef}
+                fills={mapFills}
+                fallbackFill={defaultFillColor}
+                hiddenIds={hiddenIds}
+                selectedId={selectedPathId}
+                onSeatHover={handleSeatHover}
+                onSeatClick={handleSeatClick}
+              />
 
               {/* Zoom controls — top-right */}
               <div className="zoom-controls">
@@ -418,24 +372,38 @@ export default function App() {
                   disabled={!downloadEnabled} onClick={handleDownloadSvg}>
                   <FontAwesomeIcon icon={faDownload} />
                 </button>
+                <button className="zoom-btn" title="Download PNG"
+                  disabled={!downloadEnabled} onClick={handleDownloadPng}>
+                  <FontAwesomeIcon icon={faImage} />
+                </button>
+                <button className="zoom-btn" title="Download results (CSV)"
+                  disabled={!downloadEnabled} onClick={handleDownloadCsv}>
+                  <FontAwesomeIcon icon={faFileCsv} />
+                </button>
               </div>
 
-              {/* Mini-map — bottom-right */}
+              {selectedSeat && (
+                <SeatPanel seatId={selectedSeat} seat={selectedSeatData} onClose={() => setSelectedSeat(null)} />
+              )}
+
+              {/* Mini-map — top-left */}
               <MiniMap
                 currentViewBox={currentViewBox}
                 origViewBox={origViewBox}
                 fills={mapFills}
+                fallbackFill={defaultFillColor}
+                hiddenIds={hiddenIds}
               />
             </div>
           </div>
 
           {/* Constituencies tab */}
           <div style={{ display: activeTab === 'list' ? 'block' : 'none' }}>
-            <ConstituencyList data={constituencyList} />
+            <ConstituencyList data={constituencyList} onSelect={focusSeat} />
           </div>
 
           {/* Donut chart + province toggles + seat totals — always visible */}
-          <DonutChart seats={seats} parties={parties} partyColors={partyColors} />
+          <DonutChart seats={seats} baselineSeats={startingSeats} parties={parties} partyColors={partyColors} />
 
           <h3>
             Show:{' '}
@@ -454,7 +422,7 @@ export default function App() {
             </ul>
           </h3>
           <h2>Seat Totals</h2>
-          <ResultsTable seats={seats} provinceSeats={provinceSeats} />
+          <ResultsTable seats={seats} baselineSeats={startingSeats} provinceSeats={provinceSeats} />
         </div>
       </div>
     </>

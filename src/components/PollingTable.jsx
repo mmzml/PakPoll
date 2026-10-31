@@ -1,41 +1,6 @@
-import { parties, provinces } from '../data/constants';
+import { parties, provinces, baselineProvincialPct } from '../data/constants';
 
-// Default placeholder values [party][province] = KPK, Punjab, Sindh, Balochistan
-const defaultPlaceholders = [
-  ['46.60', '38.24', '10.77', '8.60'],
-  ['9.50', '33.79', '2.93', '13.76'],
-  ['6.16', '6.08', '45.63', '10.16'],
-  ['1.15', '6.57', '2.81', '1.05'],
-  ['15.83', '0.34', '4.19', '16.08'],
-  ['6.98', '0.01', '0.06', '1.99'],
-  ['0.00', '1.74', '0.04', '0.01'],
-  ['0.01', '0.89', '0.01', '0.01'],
-  ['0.00', '0.30', '0.00', '0.00'],
-  ['0.00', '0.00', '0.00', '4.05'],
-  ['0.00', '0.01', '0.00', '7.13'],
-  ['0.00', '0.01', '9.73', '0.08'],
-  ['0.72', '0.00', '0.04', '0.19'],
-  ['0.00', '0.00', '0.10', '0.00'],
-  ['0.00', '0.00', '0.00', '0.75'],
-  ['4.33', '1.12', '4.51', '0.84'],
-  ['0.00', '0.03', '0.00', '0.00'],
-  ['0.00', '0.00', '0.00', '1.52'],
-  ['0.42', '0.00', '0.00', '0.07'],
-  ['0.00', '0.00', '0.00', '2.97'],
-  ['0.00', '0.00', '0.00', '6.18'],
-  ['0.02', '0.00', '0.00', '4.52'],
-  ['1.18', '0.00', '0.00', '0.00'],
-  ['0.44', '0.00', '0.00', '0.00'],
-  ['0.26', '0.16', '0.34', '0.09'],
-  ['0.07', '0.00', '0.00', '0.00'],
-  ['0.00', '0.00', '11.16', '0.00'],
-  ['0.00', '0.00', '0.94', '0.00'],
-  ['0.00', '0.00', '0.00', '0.95'],
-  ['0.00', '0.00', '0.00', '0.47'],
-  ['6.34', '10.80', '6.73', '18.51'],
-];
-
-export default function PollingTable({ inputs, onChange, onClear }) {
+export default function PollingTable({ inputs, onChange, totals }) {
   return (
     <table className="polling-table" id="pollingTable">
       <thead>
@@ -48,21 +13,38 @@ export default function PollingTable({ inputs, onChange, onClear }) {
         {parties.map((party, pi) => (
           <tr key={party}>
             <td>{party}</td>
-            {provinces.map((_, prov) => (
+            {provinces.map((prov, provIdx) => (
               <td key={prov}>
                 <input
                   type="number"
                   min="0"
                   step="any"
-                  placeholder={defaultPlaceholders[pi][prov]}
-                  value={inputs[pi][prov]}
-                  onChange={e => onChange(pi, prov, e.target.value)}
+                  placeholder={(baselineProvincialPct[prov][pi] ?? 0).toFixed(2)}
+                  value={inputs[pi][provIdx]}
+                  onChange={e => onChange(pi, provIdx, e.target.value)}
                 />
               </td>
             ))}
           </tr>
         ))}
       </tbody>
+      <tfoot>
+        <tr>
+          <td>Total</td>
+          {provinces.map(prov => {
+            const { total, valid } = totals[prov];
+            return (
+              <td
+                key={prov}
+                className={`total-cell ${valid ? 'ok' : 'off'}`}
+                title={valid ? undefined : 'Should add up to about 100%'}
+              >
+                {total.toFixed(1)}%
+              </td>
+            );
+          })}
+        </tr>
+      </tfoot>
     </table>
   );
 }

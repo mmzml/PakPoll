@@ -14,26 +14,34 @@ function arcPath(startAngle, endAngle) {
   ].join(' ');
 }
 
-export default function DonutChart({ seats, parties, partyColors }) {
+export default function DonutChart({ seats, baselineSeats, parties, partyColors }) {
   const total = seats.reduce((s, v) => s + v, 0);
   const majority = Math.floor(total / 2) + 1;
 
   const slices = useMemo(() => {
     const items = parties
-      .map((name, i) => ({ name, color: partyColors[i], count: seats[i] }))
+      .map((name, i) => ({ name, color: partyColors[i], count: seats[i], change: seats[i] - baselineSeats[i] }))
       .filter(p => p.count > 0)
       .sort((a, b) => b.count - a.count);
 
-    let cumAngle = -Math.PI / 2; // start from top
-    return items.map(item => {
-      const sweep = (item.count / total) * 2 * Math.PI;
-      const start = cumAngle;
-      cumAngle += sweep;
-      return { ...item, startAngle: start, endAngle: cumAngle };
-    });
-  }, [seats, parties, partyColors, total]);
+    // Each slice starts where the previous one ended; the first starts from the top
+    return items.reduce((acc, item) => {
+      const start = acc.length ? acc[acc.length - 1].endAngle : -Math.PI / 2;
+      const end = start + (item.count / total) * 2 * Math.PI;
+      return [...acc, { ...item, startAngle: start, endAngle: end }];
+    }, []);
+  }, [seats, baselineSeats, parties, partyColors, total]);
+
+  const leader = slices[0];
+  let summary = null;
+  if (leader) {
+    summary = leader.count >= majority
+      ? <><strong>{leader.name}</strong> wins a majority with {leader.count} seats ({majority} needed).</>
+      : <>Hung parliament: <strong>{leader.name}</strong> is the largest party with {leader.count} seats, {majority - leader.count} short of a majority.</>;
+  }
 
   return (
+    <>
     <div className="donut-container">
       <div className="donut-svg-wrap">
         <svg width="150" height="150" viewBox="0 0 150 150">
@@ -70,14 +78,21 @@ export default function DonutChart({ seats, parties, partyColors }) {
       </div>
 
       <div className="donut-legend">
-        {slices.map(({ name, color, count }) => (
+        {slices.map(({ name, color, count, change }) => (
           <div key={name} className="donut-legend-item">
             <span className="legend-dot" style={{ background: `#${color}` }} />
             <span className="donut-legend-name">{name}</span>
             <span className="donut-legend-count">{count}</span>
+            {change !== 0 && (
+              <span className={`donut-legend-change ${change > 0 ? 'seat-gain' : 'seat-loss'}`}>
+                {change > 0 ? `+${change}` : change}
+              </span>
+            )}
           </div>
         ))}
       </div>
     </div>
+    {summary && <p className="majority-summary">{summary}</p>}
+    </>
   );
 }

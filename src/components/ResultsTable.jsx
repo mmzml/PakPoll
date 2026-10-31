@@ -1,6 +1,12 @@
 import { parties, provinces } from '../data/constants';
 
-export default function ResultsTable({ seats, provinceSeats }) {
+function formatChange(n) {
+  if (n > 0) return `+${n}`;
+  if (n < 0) return `${n}`;
+  return '–';
+}
+
+export default function ResultsTable({ seats, baselineSeats, provinceSeats }) {
   return (
     <div id="seats" style={{ overflowX: 'auto', width: '100%' }}>
       <table className="results-table" id="resultsTable">
@@ -16,6 +22,17 @@ export default function ResultsTable({ seats, provinceSeats }) {
             {seats.map((count, i) => (
               <td key={i}>{count}</td>
             ))}
+          </tr>
+          <tr>
+            <th>Change vs 2024</th>
+            {seats.map((count, i) => {
+              const change = count - baselineSeats[i];
+              return (
+                <td key={i} className={change > 0 ? 'seat-gain' : change < 0 ? 'seat-loss' : ''}>
+                  {formatChange(change)}
+                </td>
+              );
+            })}
           </tr>
           {provinceSeats && provinces.map(prov => (
             <tr key={prov}>

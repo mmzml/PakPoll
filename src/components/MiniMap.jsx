@@ -1,31 +1,19 @@
-import { useRef, useEffect } from 'react';
+import { useRef, memo } from 'react';
 import mapSvgString from '../assets/pakistan-map.svg?raw';
+import { useMapStyles } from '../hooks/useMapStyles';
 
-export default function MiniMap({ currentViewBox, origViewBox, fills }) {
+// Shared object so React doesn't re-insert the SVG on every render (see PakistanMap)
+const mapMarkup = { __html: mapSvgString };
+
+// memo: the mini-map only re-renders when the view or styling changes, and the
+// injected SVG markup is never re-parsed
+const MiniMap = memo(function MiniMap({ currentViewBox, origViewBox, fills, fallbackFill, hiddenIds }) {
   const svgContainerRef = useRef(null);
-
-  // Apply party fills to the mini-map SVG whenever they change
-  useEffect(() => {
-    if (!svgContainerRef.current) return;
-    const svg = svgContainerRef.current.querySelector('svg');
-    if (!svg) return;
-    if (!fills) {
-      // Clear all fills back to default
-      svg.querySelectorAll('path[id^="path"]').forEach(p => p.style.fill = '');
-      return;
-    }
-    fills.forEach((color, pathId) => {
-      const el = svg.getElementById(pathId);
-      if (el) el.style.fill = color;
-    });
-  }, [fills]);
-
-  if (!origViewBox) return null;
-
-  const { x: ox, y: oy, w: ow, h: oh } = origViewBox;
+  useMapStyles(svgContainerRef, { fills, fallbackFill, hiddenIds });
 
   let rectStyle = null;
-  if (currentViewBox) {
+  if (origViewBox && currentViewBox) {
+    const { x: ox, y: oy, w: ow, h: oh } = origViewBox;
     const { x: cx, y: cy, w: cw, h: ch } = currentViewBox;
     rectStyle = {
       left:   `${((cx - ox) / ow) * 100}%`,
@@ -35,14 +23,18 @@ export default function MiniMap({ currentViewBox, origViewBox, fills }) {
     };
   }
 
+  // Stay mounted (hidden) until the main map reports its viewBox, so the styling
+  // hook always has an SVG to work on
   return (
-    <div className="mini-map">
+    <div className="mini-map" hidden={!origViewBox}>
       <div
         ref={svgContainerRef}
         className="mini-map-svg-wrap"
-        dangerouslySetInnerHTML={{ __html: mapSvgString }}
+        dangerouslySetInnerHTML={mapMarkup}
       />
       {rectStyle && <div className="mini-map-viewport" style={rectStyle} />}
     </div>
   );
-}
+});
+
+export default MiniMap;
