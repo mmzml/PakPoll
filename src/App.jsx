@@ -59,6 +59,7 @@ export default function App() {
   const [currentViewBox, setCurrentViewBox] = useState(null);
   const [origViewBox, setOrigViewBox] = useState(null);
   const [mapFills, setMapFills] = useState(null);
+  const [swingMode, setSwingMode] = useState('uniform');
 
   const mapRef = useRef(null);
   const tooltipDataMapRef = useRef(null);
@@ -113,6 +114,8 @@ export default function App() {
     return data;
   }
 
+  // Each swing entry holds the additive change (uniform) and the multiplicative ratio (proportional).
+  // ratio is null when the party had no baseline share, since a ratio can't be applied to 0.
   function calculateSwings(userInputData) {
     const swings = {};
     provinces.forEach(province => {
@@ -120,13 +123,24 @@ export default function App() {
       for (let i = 0; i < parties.length; i++) {
         const userPct = userInputData[province][i];
         const baselinePct = baselineProvincialPct[province][i] ?? 0;
-        swings[province].push(userPct - baselinePct);
+        swings[province].push({
+          diff: userPct - baselinePct,
+          ratio: baselinePct > 0 ? userPct / baselinePct : null,
+        });
       }
     });
     return swings;
   }
 
-  function applySwingsAndColorMap(swings) {
+  function applySwing(base, swing, mode) {
+    if (!swing) return base;
+    // Proportional: scale the constituency share by the provincial ratio.
+    // Falls back to uniform for parties with no provincial baseline.
+    if (mode === 'proportional' && swing.ratio !== null) return base * swing.ratio;
+    return base + swing.diff;
+  }
+
+  function applySwingsAndColorMap(swings, mode) {
     const svgMap = mapRef.current?.getSvg();
     if (!svgMap) {
       setStatus('Error: SVG map not found.');
@@ -163,7 +177,7 @@ export default function App() {
       const basePcts = parties.map((_, pi) => (constData.partyVotes?.[pi] || 0) / totalVotes * 100);
 
       // Apply swing, clamp negatives to 0, normalize so sum = 100%
-      const clamped = basePcts.map((base, pi) => Math.max(0, base + (provinceSwings[pi] || 0)));
+      const clamped = basePcts.map((base, pi) => Math.max(0, applySwing(base, provinceSwings[pi], mode)));
       const clampedTotal = clamped.reduce((s, v) => s + v, 0);
       const normalized = clampedTotal > 0
         ? clamped.map(v => v / clampedTotal * 100)
@@ -289,7 +303,7 @@ export default function App() {
       try {
         const userInput = getPollingInput();
         const swings = calculateSwings(userInput);
-        const success = applySwingsAndColorMap(swings);
+        const success = applySwingsAndColorMap(swings, swingMode);
         setDownloadEnabled(success);
       } catch (err) {
         console.error(err);
@@ -345,6 +359,18 @@ export default function App() {
           </div>
           <div style={{ overflowX: 'auto', width: '100%' }}>
             <PollingTable inputs={inputs} onChange={handleInputChange} />
+          </div>
+          <div className="swing-toggle">
+            <span className={swingMode === 'uniform' ? 'active' : ''}>Uniform swing</span>
+            <label className="switch" title="Toggle between uniform and proportional swing">
+              <input
+                type="checkbox"
+                checked={swingMode === 'proportional'}
+                onChange={e => setSwingMode(e.target.checked ? 'proportional' : 'uniform')}
+              />
+              <span className="slider" />
+            </label>
+            <span className={swingMode === 'proportional' ? 'active' : ''}>Proportional swing</span>
           </div>
           <div className="button-container">
             <button className="map-button" onClick={handleGenerateMap}>Generate Map</button>
