@@ -80,6 +80,10 @@ function getProvinceTotals(pollingData) {
   }));
 }
 
+// 2024 results (no swing), so hover and click work before a map is generated
+const baselineConstituencies = projectSeats(getPollingInput(initialInputs), 'uniform')
+  .constituencies.map(c => ({ ...c, isBaseline: true }));
+
 function getElementIds(provinceKey) {
   const config = provinceElements[provinceKey];
   if (!config) return [];
@@ -121,20 +125,23 @@ export default function App() {
   // Everything the page shows is derived from the latest projection
   const seats = projection?.seats ?? startingSeats;
   const provinceSeats = projection?.seatsByProvince ?? initialProvinceSeats;
-  const constituencyList = projection?.constituencies ?? null;
-  const downloadEnabled = !!projection && projection.errors === 0 && projection.missingPaths === 0;
+  // Until a map is generated, the list, tooltips and exports use the 2024 results
+  const constituencyList = projection?.constituencies ?? baselineConstituencies;
+  const downloadEnabled = !projection || (projection.errors === 0 && projection.missingPaths === 0);
+  const exportName = projection ? `projection_${projection.mode}` : '2024_results';
 
   const seatsByPath = useMemo(
-    () => new Map((constituencyList ?? []).map(c => [c.pathId, c])),
+    () => new Map(constituencyList.map(c => [c.pathId, c])),
     [constituencyList],
   );
+  // No fills before a map is generated: the SVG file's own 2024 colours are shown
   const mapFills = useMemo(() => {
-    if (!constituencyList) return null;
-    return new Map(constituencyList.map(c => [
+    if (!projection) return null;
+    return new Map(projection.constituencies.map(c => [
       c.pathId,
       c.winnerIdx !== -1 && partyColors[c.winnerIdx] ? `#${partyColors[c.winnerIdx]}` : defaultFillColor,
     ]));
-  }, [constituencyList]);
+  }, [projection]);
   const hiddenIds = useMemo(
     () => new Set(provinceCheckboxes.filter(({ key }) => !provincesVisible[key]).flatMap(({ key }) => getElementIds(key))),
     [provincesVisible],
@@ -231,7 +238,7 @@ export default function App() {
     const svgMap = mapRef.current?.getSvg();
     if (!svgMap || !origViewBox) { setStatus('Error: Cannot find the SVG map element.', 'error'); return; }
     try {
-      downloadBlob(exportMapSvg(svgMap, origViewBox), 'pakistan_polling_map_generated.svg');
+      downloadBlob(exportMapSvg(svgMap, origViewBox), `pakpoll_${exportName}.svg`);
       setStatus('SVG download started.');
     } catch (err) {
       console.error(err);
@@ -248,12 +255,14 @@ export default function App() {
         .map((name, i) => ({ name, color: partyColors[i], count: seats[i], change: seats[i] - startingSeats[i] }))
         .filter(p => p.count > 0)
         .sort((a, b) => b.count - a.count);
+      const basis = !projection ? '2024 results'
+        : projection.mode === 'proportional' ? 'Proportional swing' : 'Uniform swing';
       const blob = await exportMapPng(svgMap, origViewBox, {
-        title: 'Pakistan National Assembly projection',
-        subtitle: `${projection.mode === 'proportional' ? 'Proportional' : 'Uniform'} swing · ${describeResult(seats)} · PakPoll`,
+        title: projection ? 'Pakistan National Assembly projection' : 'Pakistan National Assembly 2024 results',
+        subtitle: `${basis} · ${describeResult(seats)} · PakPoll`,
         legend,
       });
-      downloadBlob(blob, `pakpoll_projection_${projection.mode}.png`);
+      downloadBlob(blob, `pakpoll_${exportName}.png`);
       setStatus('PNG download started.', 'success');
     } catch (err) {
       console.error(err);
@@ -262,9 +271,8 @@ export default function App() {
   }
 
   function handleDownloadCsv() {
-    if (!constituencyList) return;
     const csv = buildResultsCsv(constituencyList, parties);
-    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `pakpoll_results_${projection.mode}.csv`);
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `pakpoll_${exportName}.csv`);
     setStatus('CSV download started.', 'success');
   }
 

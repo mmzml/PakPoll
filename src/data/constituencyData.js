@@ -107,7 +107,7 @@ export const constituencyResultsData = [
             {id: 'NA-106 Toba Tek Singh-II', province: 'Punjab', totalVotes: 306717, partyVotes: [137105, 137779, 3360, 11313, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3970, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13190]},
             {id: 'NA-107 Toba Tek Singh-III', province: 'Punjab', totalVotes: 287084, partyVotes: [129971, 96083, 3778, 14411, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42841]},
             {id: 'NA-108 Jhang-I', province: 'Punjab', totalVotes: 334967, partyVotes: [169676, 134369, 3651, 5920, 3453, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 144, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17754]},
-            {id: 'NA-109 Jhang-II', province: 'Punjab', totalVotes: 299603, partyVotes: [176699, 61803, 3257, 7353, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2403, 0, 0, 0, 0, 36410, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11678]},
+            {id: 'NA-109 Jhang-II', province: 'Punjab', totalVotes: 299603, partyVotes: [176699, 61803, 3257, 7353, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2403, 0, 0, 0, 0, 0, 0, 0, 0, 36410, 0, 0, 0, 0, 0, 11678]},
             {id: 'NA-110 Jhang-III', province: 'Punjab', totalVotes: 339856, partyVotes: [199853, 104422, 3065, 6964, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25552]},
             {id: 'NA-111 Nankana Sahib-I', province: 'Punjab', totalVotes: 248135, partyVotes: [113711, 93467, 4530, 25345, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2527, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8555]},
             {id: 'NA-112 Nankana Sahib-II', province: 'Punjab', totalVotes: 244474, partyVotes: [93329, 105656, 13452, 20895, 0, 0, 0, 164, 0, 0, 0, 0, 0, 0, 0, 892, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10086]},

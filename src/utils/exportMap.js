@@ -125,14 +125,20 @@ function csvField(value) {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-// One row per constituency with every party's projected share
+// One row per constituency with every party's projected share. For the 2024 baseline
+// (no projection yet) the projected columns would just repeat 2024, so they're dropped.
 export function buildResultsCsv(constList, parties) {
-  const header = ['Constituency', 'Province', 'Winner 2024', 'Projected winner', 'Margin (pts)',
-    ...parties.map(p => `${p} %`)];
+  const isBaseline = constList[0]?.isBaseline;
+  const header = isBaseline
+    ? ['Constituency', 'Province', 'Winner 2024', 'Margin (pts)', ...parties.map(p => `${p} 2024 %`)]
+    : ['Constituency', 'Province', 'Winner 2024', 'Projected winner', 'Margin (pts)', ...parties.map(p => `${p} %`)];
   const rows = constList.map(c => {
     const sorted = [...c.projectedPcts].sort((a, b) => b - a);
+    const margin = (sorted[0] - (sorted[1] ?? 0)).toFixed(2);
     return [
-      c.id, c.province, c.prevWinner, c.currWinner, (sorted[0] - (sorted[1] ?? 0)).toFixed(2),
+      c.id, c.province, c.prevWinner,
+      ...(isBaseline ? [] : [c.currWinner]),
+      margin,
       ...c.projectedPcts.map(v => v.toFixed(2)),
     ];
   });

@@ -564,6 +564,12 @@ h2, h3 {
     color: var(--text);
 }
 
+.const-baseline-note {
+    color: var(--status-color);
+    font-size: 0.85em;
+    font-style: italic;
+}
+
 .const-list-none {
     padding: 40px;
     text-align: center;
